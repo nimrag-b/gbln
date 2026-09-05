@@ -152,9 +152,9 @@ GBLN_STRUCT_DEF* EndGblnStructDef(){
 	return def;
 }
 
-void StartVM();
+void StartVM(GBLN_object* gobject);
 
-int main(){
+int main(int argc, char** argv){
 
 /*	
 	StartGblnStructDef("ExampleStruct");
@@ -170,7 +170,31 @@ int main(){
 	}
 */
 
-	StartVM();
+	if(argc == 1){
+		printf("usage: gbln [input]\n");
+		return 0;
+	}
+
+	char* input = argv[1];
+
+
+	GblnCompilerStart();
+
+	if(GblnCompileGasm(input) != 0){
+		return -1;
+	}
+	
+	GBLN_object gobject;
+	int status = GblnCompilerExtract(&gobject);
+
+	if(status != 0){
+		return -1;
+	}
+
+	puts("compiled");
+
+
+	StartVM(&gobject);
 
 	return 0;
 }

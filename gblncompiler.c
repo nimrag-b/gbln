@@ -848,7 +848,7 @@ strdirstart:
 		
 next:
 		if(gbln_err != NULL){
-			printf("ERROR at %s:%d (%s): %s\n",curfile,curline, rawline,gbln_err);
+			printf("gblnasm:"C_RED"ERROR"C_RESET" at %s:%d (%s): %s\n",curfile,curline, rawline,gbln_err);
 			return -1;
 		}
 #ifdef GBLN_PRIBT_COMPILE
@@ -936,7 +936,7 @@ int GblnCompilerExtract(GBLN_object* gobject){
 }
 int OutputGblno(const char* filename, GBLN_object* gobject){
 
-	puts("WARNING: OutputGblno is not fully implemented");
+	puts("gblnasm:WARNING: OutputGblno is not fully implemented");
 	FILE* fptr = fopen(filename, "wb");
 
 	fputs("GBLNO",fptr);
@@ -981,6 +981,7 @@ int OutputGblno(const char* filename, GBLN_object* gobject){
 int GblnCompileGasm(const char* filename){
 	FILE* fptr = fopen(filename, "r");
 	if(fptr == NULL){
+		printf("gblnasm:"C_RED "ERROR:"C_RESET" no file with name '%s' exists\n",filename);
 		return -1;
 	}
 	curline = 1;

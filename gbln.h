@@ -5,6 +5,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+
+
+#define C_RED "\033[31m"
+#define C_RESET "\033[0m"
+
+
+
 enum GBLN_type{
 	GBLN_INT_T,
 	GBLN_FLOAT_T,

@@ -634,32 +634,17 @@ void InitInbuiltFuncs(GBLN_object* gobject){
 
 }
 
-void StartVM(){
+void StartVM(GBLN_object* gobject){
 	GBLN_vm vm;
 	InitGBLN_vm(&vm);
-	GblnCompilerStart();
+	//OutputGblno("a.gblno", &gobject);
+	InitInbuiltFuncs(gobject);
 
-	if(GblnCompileGasm("test.gasm") != 0){
-		return;
-	}
-	
-	GBLN_object gobject;
-	int status = GblnCompilerExtract(&gobject);
-
-	if(status != 0){
-		return;
-	}
-
-	puts("compiled");
-
-	OutputGblno("a.gblno", &gobject);
-	InitInbuiltFuncs(&gobject);
-
-
-	for (int i = 0; i < gobject.funcslen; i++) {
-		if((gobject.func_table[i].flags & GF_RESOLVED) == 0){
+	int status = 0;
+	for (int i = 0; i < gobject->funcslen; i++) {
+		if((gobject->func_table[i].flags & GF_RESOLVED) == 0){
 			status = -1;
-			printf("LINK ERROR: unresolved function '%s'\n",gobject.func_table[i].name);
+			printf("LINK ERROR: unresolved function '%s'\n",gobject->func_table[i].name);
 		}	
 	}
 
@@ -668,15 +653,15 @@ void StartVM(){
 	}
 
 
-	vm.program = gobject.code;
-	vm.func_table = gobject.func_table;
-	vm.entry_func = gobject.entryfunc;
+	vm.program = gobject->code;
+	vm.func_table = gobject->func_table;
+	vm.entry_func = gobject->entryfunc;
 	
-	vm.func_count = gobject.funcslen;
-	vm.program_length = gobject.codelen;
+	vm.func_count = gobject->funcslen;
+	vm.program_length = gobject->codelen;
 	
-	vm.data = gobject.data;
-	vm.data_size = gobject.datalen;
+	vm.data = gobject->data;
+	vm.data_size = gobject->datalen;
 
 	call_internal(&vm, &vm.func_table [vm.entry_func]);
 
