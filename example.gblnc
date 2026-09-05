@@ -1,0 +1,29 @@
+
+gbln0.0.1
+.section data
+.struct ExampleStruct{
+.size 2
+int age
+float height
+}
+
+.extern ExampleFunc{
+.args 1
+int foo
+}
+
+
+.section text
+#bytecode here
+
+.ctor 0 ExampleStruct{
+.args 2
+int age
+float height
+}
+
+.function InternalFunc{
+
+}
+
+

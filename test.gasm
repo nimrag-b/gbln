@@ -1,0 +1,112 @@
+.section text
+
+.function puts{
+
+store 0
+
+push int 0
+istore 1
+
+loop:
+
+load 0
+ldfield 0
+load 1
+isub
+
+
+ifz done
+
+load 0
+ldfield 1
+load 1
+ldarr
+call "print_char"
+load 1
+push int 1
+iadd
+istore 1
+
+jmp loop
+done:
+return
+}
+
+.function main{
+.entrypoint
+
+lddata hello
+call "puts"
+
+push int 31
+call "foobar"
+
+return
+
+}
+
+.function foobar{
+istore 1
+push int 0
+istore 0
+
+loop:
+
+load 0
+idup
+push int 3
+imod
+ifnz testfive
+lddata foo
+call "puts"
+
+push int 5
+imod 
+ifnz next
+lddata bar
+call "puts"
+
+jmp next
+
+
+testfive:
+idup
+push int 5
+imod 
+ifnz printnum
+pop int
+lddata bar
+call "puts"
+jmp next
+
+printnum:
+call "print_int"
+
+next:
+
+push byte 10
+call "print_char"
+
+load 0
+push int 1
+iadd
+istore 0
+load 1
+load 0
+isub
+ifz done
+
+jmp loop
+
+
+done:
+
+return
+}
+
+.section data
+
+.string hello "Hello World!", 10
+
+.string foo "foo"
+.string bar "bar"

@@ -1,0 +1,22 @@
+opcode,args,mnemonic,action,description
+00,0,NOP,No-Op,Does Nothing
+01,0,iADD,s0 + s1 -> [s], Integer Addition
+02,0,fADD,s0 + s1 -> [s], Floating point Addition
+03,0,iSUB,s0 - s1 -> [s], Integer Subtraction
+04,0,fSUB,s0 - s1 -> [s], Floating point Subtraction
+05,0,iMUL,s0 * s1 -> [s], Integer Multiplication
+06,0,fMUL,s0 * s1 -> [s], Floating point Multiplication
+07,0,iDIV,s0 / s1 -> [s], Integer Division
+08,0,fDIV,s0 / s1 -> [s], Floating point Division
+09,0,iMOD,s0 % s1 -> [s], Integer Modulo
+0A,1,iPUSH,lx -> [s], Integer Push to Stack
+0B,1,fPUSH,lx -> [s], Floating point Push to Stack
+0C,1,iPOP,s1 -> lx, Integer Pop from Stack
+0D,1,fPOP,s1 -> lx, Floating point Pop from Stack
+0E,1,iSTORE,
+0F,1,fSTORE,
+10,1,iLOAD,
+11,1,fLOAD,
+12,1,FIELD,
+
+
