@@ -68,6 +68,33 @@ int isfuncname(char ch){
 	return (isalnum(ch) || (ch=='_'));
 }
 
+void eatspaces(char** ptr){
+	while(isspace(**ptr)) (*ptr)++;
+}
+
+char* gettoken(char** ptr){
+	char* tok = *ptr;
+	while(isfuncname(**ptr)){
+		(*ptr)++;
+	}
+
+	**ptr = 0;
+	(*ptr)++;
+	return tok;
+}
+
+char* gettoken_s(char** ptr, size_t* len){
+	*len = 0;
+	char* tok = *ptr;
+	while(isfuncname(**ptr)){
+		(*ptr)++;
+		(*len)++;
+
+	}
+	return tok;
+
+}
+
 static void resize_buf(size_t bytes){
 	while((len + bytes) >= cap){
 		cap *= 2;
@@ -77,6 +104,9 @@ static void resize_buf(size_t bytes){
 
 static void eat_empty(char* line){
 	while(*line != '\n' && *line != 0){
+
+		if(*line == ';') return; //comment handling
+
 		if(!isspace(*line)){
 			SET_ERR("unexpected token (%d)'%c'",*line, *line);
 		}
@@ -613,6 +643,160 @@ static GBLN_data* next_data(char* name){
 	return data;
 }
 
+
+void parse_directive(char* ptr){
+	ptr++;
+
+	char* op = gettoken(&ptr);
+	//printf("%s\n",op);
+			
+	if(strcmp(op,"section") == 0){
+
+		eatspaces(&ptr);
+		size_t section_len;
+		char* section_name = gettoken_s(&ptr, &section_len);
+		eat_empty(ptr);
+
+		if(strncmp(section_name,"text",section_len) == 0){
+			cur_section = TEXT_SECTION;
+		}
+		else if(strncmp(section_name,"data",section_len) == 0){
+			cur_section = DATA_SECTION;
+		}
+
+		return;
+
+	}
+
+	if(cur_section == DATA_SECTION){
+		if(strcmp(op, "string") == 0){
+
+			eatspaces(&ptr);
+			char* data_name = gettoken(&ptr);
+
+			int scrcap = 128;
+			int scrlen = 0;
+			char* scratchbuf = malloc(scrcap);
+strdirstart:
+			eatspaces(&ptr);
+
+			switch (*ptr) {
+			case '"':
+			if(*ptr != '"'){
+				SET_ERR("expected '%c' found '%c'",'"',*ptr);
+				return;
+			}
+			ptr++;
+			while(*ptr != '"'){
+				if(scrlen == scrcap){
+
+					scrcap*=2;
+					scratchbuf = realloc(scratchbuf,scrcap);
+				}
+					scratchbuf[scrlen++] = *ptr;						if(*ptr == 0){
+					SET_ERR("unclosed string '%s'",scratchbuf);
+					free(scratchbuf);
+					return;
+				}
+				ptr++;
+			}
+			ptr++;
+			break;
+
+			default:
+			if(isdigit(*ptr)){
+				int l = atoi(ptr);
+				if (l > 0xFF){
+					SET_ERR("char too big '%d'",l);
+					free(scratchbuf);
+					return;
+				}
+				char cl = l;
+				if(scrlen == scrcap){
+
+					scrcap*=2;
+					scratchbuf = realloc(scratchbuf,scrcap);
+				}
+				scratchbuf[scrlen++] = cl;
+			}
+			break;
+			}
+
+			eatspaces(&ptr);
+			if(*ptr == ','){
+				ptr++;
+				goto strdirstart;
+			}
+
+			scratchbuf[scrlen] = 0;
+				
+
+			GBLN_data* data = next_data(data_name);
+			data->data.type = GBLN_STRUCT_T;
+			data->data.struct_val = AllocGblnStr(scratchbuf);
+			define_data_label(data->name, data_len - 1);
+			free(scratchbuf);
+		}
+		else{
+			SET_ERR("invalid data directive '.%s'",op);
+		}
+		return;
+		
+	}
+			
+	if(strcmp(op, "function") == 0){
+		if(cur_sym){
+			SET_ERR("cannot declare a function within a function",0);
+			return;
+		}
+		eatspaces(&ptr);
+		char* func_name = ptr;
+		while(isfuncname(*ptr)) ptr++;
+		char* closing = ptr;
+		eatspaces(&closing);
+		if(*closing != '{'){
+			SET_ERR("function directive must end with '{'",0);
+			return;
+		}
+		*ptr = 0;
+		ptr++;
+		closing++;
+		//printf("    %s\n",func_name);
+		add_function(func_name, len);
+		eat_empty(closing);
+		return;
+
+	}
+	else{
+		if(cur_sym == NULL){
+			SET_ERR("'%s' must be inside function block",op);
+			return;
+		}
+
+		if(strcmp(op,"internal") == 0){
+			if(cur_sym->flags & GF_EXTERNAL){
+				incompatable_flags_err("internal","entrypoint");
+			}
+
+			cur_sym->flags |= GF_EXTERNAL;
+			eat_empty(op + strlen(op));
+			return;
+		}
+		else if(strcmp(op,"entrypoint") == 0){
+			if(cur_sym->flags & GF_EXTERNAL){
+				incompatable_flags_err("entrypoint","internal");
+			}
+			entryfunc = cur_sym->entry;		
+			eat_empty(op + strlen(op));
+			return;
+		}
+	}
+	
+	SET_ERR("invalid directive '.%s'",op);
+	
+
+}
+
 static int asm_to_bin(char* data){
 	if(data[0] == '\n'){
 		curline++;
@@ -633,160 +817,13 @@ static int asm_to_bin(char* data){
 		line[strlen(line)] = '\n';
 
 		char* ptr = line;
-		char ch = *ptr;
-		char* op = line;
 
-
-
-		while(ch && !isspace(ch)){
-			ch = *++ptr;
-		}
-		*ptr = 0;
-		ptr++;
+		eatspaces(&ptr);
+		if(ptr[0] == ';') goto next;
 	
-		if(line[0] == '.'){ //directive
-			op++;
-			//printf("%s\n",op);
-			
-			if(strcmp(op,"section") == 0){
-
-				while(isspace(*ptr)){ptr++;}
-				char* section_name = ptr;
-				while(isfuncname(*ptr)) ptr++;
-				*ptr = 0;
-
-				if(strcmp(section_name,"text") == 0){
-					cur_section = TEXT_SECTION;
-				}
-				else if(strcmp(section_name,"data") == 0){
-					cur_section = DATA_SECTION;
-				}
-
-				goto next;
-
-			}
-
-			if(cur_section == DATA_SECTION){
-				if(strcmp(op, "string") == 0){
-
-					while(isspace(*ptr)){ptr++;}
-					char* data_name = ptr;
-					while(isfuncname(*ptr)){ptr++;}
-					*ptr = 0;
-					ptr++;
-					int scrcap = 128;
-					int scrlen = 0;
-					char* scratchbuf = malloc(scrcap);
-strdirstart:
-					while(isspace(*ptr)){ptr++;}
-					
-
-					switch (*ptr) {
-					case '"':
-					if(*ptr != '"'){
-						SET_ERR("expected '%c' found '%c'",'"',*ptr);
-						goto next;
-					}
-					ptr++;
-					while(*ptr != '"'){
-						if(scrlen == scrcap){
-
-							scrcap*=2;
-							scratchbuf = realloc(scratchbuf,scrcap);
-						}
-						scratchbuf[scrlen++] = *ptr;
-						if(*ptr == 0){
-							SET_ERR("unclosed string '%s'",scratchbuf);
-							goto next;
-						}
-						ptr++;
-					}
-					ptr++;
-					break;
-
-					default:
-					if(isdigit(*ptr)){
-						int l = atoi(ptr);
-						if (l > 0xFF){
-							SET_ERR("char too big '%d'",l);
-						}
-						char cl = l;
-						if(scrlen == scrcap){
-
-							scrcap*=2;
-							scratchbuf = realloc(scratchbuf,scrcap);
-						}
-						scratchbuf[scrlen++] = cl;
-					}
-					break;
-					}
-
-					while(isspace(*ptr)){ptr++;}
-					if(*ptr == ','){
-						ptr++;
-						goto strdirstart;
-					}
-
-					scratchbuf[scrlen] = 0;
-				
-
-					GBLN_data* data = next_data(data_name);
-					data->data.type = GBLN_STRUCT_T;
-					data->data.struct_val = AllocGblnStr(scratchbuf);
-					define_data_label(data->name, data_len - 1);
-					free(scratchbuf);
-				}
-				else{
-					SET_ERR("invalid data directive '%s'",rawline);
-				}
-				goto next;
-			}
-			
-			if(strcmp(op, "function") == 0){
-				if(cur_sym){
-					SET_ERR("cannot declare a function within a function",0);
-					goto next;
-				}
-				while(isspace(*ptr)){ptr++;}
-				char* func_name = ptr;
-				while(isfuncname(*ptr)) ptr++;
-				char* closing = ptr;
-				while(isspace(*closing)){closing++;}
-				if(*closing != '{'){
-					SET_ERR("function directive must end with '{'",0);
-					goto next;
-				}
-				*ptr = 0;
-				ptr++;
-				closing++;
-				//printf("    %s\n",func_name);
-				add_function(func_name, len);
-				eat_empty(closing);
-
-			}
-			else{
-				if(cur_sym == NULL){
-					SET_ERR("'%s' must be inside function block",op);
-					goto next;
-				}
-
-				if(strcmp(op,"internal") == 0){
-					if(cur_sym->flags & GF_EXTERNAL){
-						incompatable_flags_err("internal","entrypoint");
-					}
-
-					cur_sym->flags |= GF_EXTERNAL;
-					eat_empty(op + strlen(op));
-				}
-				else if(strcmp(op,"entrypoint") == 0){
-					if(cur_sym->flags & GF_EXTERNAL){
-						incompatable_flags_err("entrypoint","internal");
-					}
-					entryfunc = cur_sym->entry;		
-					eat_empty(op + strlen(op));
-				}
-			}
-			goto next; //ignore for now
+		if(ptr[0] == '.'){ //directive
+			parse_directive(line);
+			goto next;
 		}
 
 		if(cur_section == 0){
@@ -800,7 +837,7 @@ strdirstart:
 		}
 
 
-		if(line[0] == '}'){ //end function
+		if(ptr[0] == '}'){ //end function
 			if(cur_sym == NULL){
 				SET_ERR("unexpected '}'",0);
 				goto next;
@@ -812,11 +849,24 @@ strdirstart:
 			goto next; 
 		}
 
+		char* op = ptr;
 
-		if(line[strlen(line) - 1] == ':'){
-			line[strlen(line)-1] = 0;
+
+		while(!isspace(*ptr)){
+		
+			ptr++;
+		}
+		*ptr = 0;
+		ptr++;
+
+		//printf("'%s'\n",op);
+
+		
+
+		if(op[strlen(op) - 1] == ':'){
+			op[strlen(op)-1] = 0;
 			define_label(line, len);
-			eat_empty(line + strlen(line));
+			eat_empty(op + strlen(op));
 			goto next;	
 		}
 
@@ -960,7 +1010,6 @@ int OutputGblno(const char* filename, GBLN_object* gobject){
 	fputs(".section data\0", fptr);
 
 
-	fclose(fptr);
 	for(int i = 0; i < gobject->datalen; i++){
 		GBLN_data* dat = &gobject->data[i];
 		fputc(dat->data.type,fptr);
@@ -974,6 +1023,8 @@ int OutputGblno(const char* filename, GBLN_object* gobject){
 		}
 
 	}
+	
+	fclose(fptr);
 
 	return 0;
 }
